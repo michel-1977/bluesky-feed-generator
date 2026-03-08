@@ -1,0 +1,3 @@
+# Python requirements for this repository.
+# This project is a Node.js/TypeScript service, so there are currently
+# no Python runtime dependencies to install.
