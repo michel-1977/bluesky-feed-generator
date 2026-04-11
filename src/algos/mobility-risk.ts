@@ -1,23 +1,37 @@
-﻿import { QueryParams } from '../lexicon/types/app/bsky/feed/getFeedSkeleton'
+import { QueryParams } from '../lexicon/types/app/bsky/feed/getFeedSkeleton'
 import { AppContext } from '../config'
+import { decodeFeedCursor, encodeFeedCursor } from './feed-cursor'
 
 export const shortname = 'mobility-risk'
 
 export const handler = async (ctx: AppContext, params: QueryParams) => {
   const limit = sanitizeLimit(params.limit)
+  const cursor = decodeFeedCursor(params.cursor)
 
   let builder = ctx.db
     .selectFrom('post')
-    .select(['uri', 'cid', 'indexedAt'])
+    .select(['uri', 'cid', 'indexedAt', 'score'])
+    .where('filterVersion', '=', ctx.cfg.filterVersion)
+    .orderBy('score', 'desc')
     .orderBy('indexedAt', 'desc')
     .orderBy('cid', 'desc')
     .limit(limit)
 
-  if (params.cursor) {
-    const timeIso = cursorToIso(params.cursor)
-    if (timeIso) {
-      builder = builder.where('post.indexedAt', '<', timeIso)
-    }
+  if (cursor) {
+    builder = builder.where((eb) =>
+      eb.or([
+        eb('post.score', '<', cursor.score),
+        eb.and([
+          eb('post.score', '=', cursor.score),
+          eb('post.indexedAt', '<', cursor.indexedAt),
+        ]),
+        eb.and([
+          eb('post.score', '=', cursor.score),
+          eb('post.indexedAt', '=', cursor.indexedAt),
+          eb('post.cid', '<', cursor.cid),
+        ]),
+      ]),
+    )
   }
 
   const res = await builder.execute()
@@ -26,14 +40,15 @@ export const handler = async (ctx: AppContext, params: QueryParams) => {
     post: row.uri,
   }))
 
-  let cursor: string | undefined
   const last = res.at(-1)
-  if (last) {
-    cursor = new Date(last.indexedAt).getTime().toString(10)
-  }
-
   return {
-    cursor,
+    cursor: last
+      ? encodeFeedCursor({
+          score: last.score,
+          indexedAt: last.indexedAt,
+          cid: last.cid,
+        })
+      : undefined,
     feed,
   }
 }
@@ -42,13 +57,4 @@ const sanitizeLimit = (value?: number) => {
   if (!value || value < 1) return 30
   if (value > 100) return 100
   return value
-}
-
-const cursorToIso = (cursor: string) => {
-  const num = parseInt(cursor, 10)
-  if (isNaN(num)) {
-    return undefined
-  }
-
-  return new Date(num).toISOString()
 }

@@ -1,16 +1,16 @@
-﻿# Bluesky Feed Generator (Mobility Risk)
+# Bluesky Feed Generator (Mobility Risk)
 
-This folder contains a Bluesky custom feed generator scaffolded from the official template:
-`https://github.com/bluesky-social/feed-generator`.
-
-The feed indexes firehose posts that match mobility/disruption keywords (traffic, accidents, road closures, delays) and serves them via `app.bsky.feed.getFeedSkeleton`.
+This repository runs a Bluesky custom feed generator focused on mobility-impacting posts in Spain.
+It ingests the Bluesky firehose, applies a precision-first classifier, stores accepted posts in SQLite, and serves them through `app.bsky.feed.getFeedSkeleton`.
 
 ## What Is Included
 
 - TypeScript feed generator server with ATProto lexicons
 - Firehose subscription and SQLite indexing
-- A production-oriented feed algorithm: `mobility-risk`
+- Precision-first mobility classifier with trusted-source boosts and optional LLM review
+- Ranked feed output ordered by score, then recency
 - Publish/unpublish scripts for `app.bsky.feed.generator` records
+- Metrics endpoint and regression tests
 
 For setup prerequisites, see `REQUIREMENTS.md`.
 
@@ -19,18 +19,14 @@ For setup prerequisites, see `REQUIREMENTS.md`.
 ```powershell
 cd bluesky-feed-generator
 Copy-Item .env.example .env
+npm.cmd install
 ```
 
 Edit `.env` and set at least:
 
 - `FEEDGEN_HOSTNAME`: your public HTTPS hostname (for example `feeds.example.com`)
 - `FEEDGEN_PUBLISHER_DID`: DID of the account that will own the feed record
-
-Install dependencies:
-
-```powershell
-npm.cmd install
-```
+- `FEEDGEN_LLM_API_KEY`: only if you want the LLM review band enabled
 
 Start locally:
 
@@ -77,29 +73,80 @@ The generator exposes:
 - `/.well-known/did.json`
 - `/xrpc/app.bsky.feed.describeFeedGenerator`
 - `/xrpc/app.bsky.feed.getFeedSkeleton`
+- `/metrics`
 
 ## Feed Behavior
 
-The indexer stores posts that pass all enabled filters:
+Accepted posts must satisfy all of the following:
 
-1. Keyword match (`FEEDGEN_KEYWORDS`)
-2. Optional language allowlist (`FEEDGEN_LANG_ALLOWLIST`)
+1. Pass the optional language allowlist (`FEEDGEN_LANG_ALLOWLIST`)
+2. Show clear mobility impact through either:
+   - a strong transport incident phrase, or
+   - co-occurring mobility and disruption/hazard signals
+3. Include a Spain signal such as a Spanish institution, geography, road pattern, or trusted domain
+4. Reach a rule score band:
+   - `< FEEDGEN_RULE_LLM_MIN_SCORE`: reject
+   - `FEEDGEN_RULE_LLM_MIN_SCORE .. FEEDGEN_RULE_AUTO_ACCEPT_SCORE-1`: LLM review if enabled, otherwise reject
+   - `>= FEEDGEN_RULE_AUTO_ACCEPT_SCORE`: auto-accept if no negative-context hit
 
-Retention controls:
+The checked-in classifier spec also contains:
 
-- `FEEDGEN_MAX_POST_AGE_HOURS`: drops old rows (default `48`)
-- `FEEDGEN_MAX_INDEXED_POSTS`: caps DB size to newest N rows (default `2500`)
+- trusted author handles/DIDs resolved to DIDs at startup
+- trusted link domains
+- Spain geography/institution signals
+- hard-deny phrases for known false positives
 
-Storage:
+### LLM Notes
 
-- SQLite location is controlled by `FEEDGEN_SQLITE_LOCATION`
-- `:memory:` is ephemeral
-- Set a file path (for example `db.sqlite`) for persistence
+- `FEEDGEN_LLM_FILTER_ENABLED=false` keeps the system fully rule-based
+- Ambiguous posts are only sent to the LLM review band
+- `FEEDGEN_LLM_MIN_CONFIDENCE=0.85` is the precision-first default
+- `FEEDGEN_LLM_FAIL_OPEN=false` rejects ambiguous posts when the LLM call fails
+
+### Ranking And Storage
+
+Accepted posts are stored with:
+
+- `score`
+- `sourceTier`
+- `decisionReason`
+- `filterVersion`
+
+Feed ranking is:
+
+1. `score desc`
+2. `indexedAt desc`
+3. `cid desc`
+
+Only the current `filterVersion` is served, so stale noisy rows from older classifier versions are hidden immediately after rollout.
+
+### Metrics
+
+`/metrics` returns JSON counters including:
+
+- `posts_processed`
+- `posts_rejected_language`
+- `posts_rejected_hard_deny`
+- `posts_rejected_missing_mobility`
+- `posts_rejected_missing_spain`
+- `posts_rejected_low_score`
+- `posts_sent_to_llm`
+- `posts_rejected_llm`
+- `posts_llm_failures`
+- `posts_accepted_trusted`
+- `posts_accepted_non_trusted`
+
+### Retention
+
+- `FEEDGEN_MAX_POST_AGE_HOURS`: drops old rows
+- `FEEDGEN_MAX_INDEXED_POSTS`: caps persisted current-version rows to the highest-scoring recent posts
+- `FEEDGEN_SQLITE_LOCATION`: `:memory:` is ephemeral; use a file path such as `db.sqlite` for persistence
 
 ## Useful Commands
 
 ```powershell
 npm.cmd run build
+npm.cmd run test
 npm.cmd run start
 npm.cmd run publishFeed
 npm.cmd run unpublishFeed

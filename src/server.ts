@@ -9,6 +9,7 @@ import { createDb, Database, migrateToLatest } from './db'
 import { FirehoseSubscription } from './subscription'
 import { AppContext, Config } from './config'
 import wellKnown from './well-known'
+import metrics from './metrics'
 
 export class FeedGenerator {
   public app: express.Application
@@ -43,9 +44,9 @@ export class FeedGenerator {
     const server = createServer({
       validateResponse: true,
       payload: {
-        jsonLimit: 100 * 1024, // 100kb
-        textLimit: 100 * 1024, // 100kb
-        blobLimit: 5 * 1024 * 1024, // 5mb
+        jsonLimit: 100 * 1024,
+        textLimit: 100 * 1024,
+        blobLimit: 5 * 1024 * 1024,
       },
     })
     const ctx: AppContext = {
@@ -57,12 +58,14 @@ export class FeedGenerator {
     describeGenerator(server, ctx)
     app.use(server.xrpc.router)
     app.use(wellKnown(ctx))
+    app.use(metrics(ctx))
 
     return new FeedGenerator(app, db, firehose, cfg)
   }
 
   async start(): Promise<http.Server> {
     await migrateToLatest(this.db)
+    await this.firehose.init()
     this.firehose.run(this.cfg.subscriptionReconnectDelay)
     this.server = this.app.listen(this.cfg.port, this.cfg.listenhost)
     await events.once(this.server, 'listening')

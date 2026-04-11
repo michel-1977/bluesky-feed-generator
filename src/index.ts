@@ -1,34 +1,18 @@
-﻿import dotenv from 'dotenv'
+import dotenv from 'dotenv'
 import FeedGenerator from './server'
+import { FILTER_VERSION } from './classifier/spec'
 
 const DEFAULT_KEYWORDS = [
   'accidente',
-  'colisión',
-  'atasco',
+  'colision',
   'carretera cortada',
-  'inundación',
-  'diluvio',
-  'congestión',
-  'riesgo',
-  'incidente',
-  'retención',
-  'atención',
-  'inundación',
-  'inundaciones',
-  'corte de tráfico',
-  'catástrofe',
-  'desastre',
-  'cuidado',
-  'peligro',
-  'precaución',
-  'tormenta',
-  'emergencia',
-  'huracán',
-  'tornado',
-  'terremoto',
-  'avalancha',
-  'deslizamiento de tierra',
-  'volcán',
+  'corte de trafico',
+  'retenciones',
+  'atropello',
+  'incidencia renfe',
+  'inundacion',
+  'nevadas',
+  'granizo',
 ]
 
 const run = async () => {
@@ -43,6 +27,24 @@ const run = async () => {
     .toLowerCase()
   const keywords = parseCsv(process.env.FEEDGEN_KEYWORDS, DEFAULT_KEYWORDS)
   const languageAllowlist = parseCsv(process.env.FEEDGEN_LANG_ALLOWLIST)
+  const llmFilterEnabled = maybeBool(process.env.FEEDGEN_LLM_FILTER_ENABLED)
+  const llmFilterApiKey = maybeStr(process.env.FEEDGEN_LLM_API_KEY)
+  const llmFilterConfigured = (llmFilterEnabled ?? false) && !!llmFilterApiKey
+  const ruleLlmMinScore = maybeInt(process.env.FEEDGEN_RULE_LLM_MIN_SCORE) ?? 60
+  const ruleAutoAcceptScore =
+    maybeInt(process.env.FEEDGEN_RULE_AUTO_ACCEPT_SCORE) ?? 85
+
+  if ((llmFilterEnabled ?? false) && !llmFilterApiKey) {
+    console.warn(
+      'FEEDGEN_LLM_FILTER_ENABLED=true but FEEDGEN_LLM_API_KEY is missing. Ambiguous posts will be rejected.',
+    )
+  }
+
+  if (ruleAutoAcceptScore < ruleLlmMinScore) {
+    throw new Error(
+      'FEEDGEN_RULE_AUTO_ACCEPT_SCORE must be greater than or equal to FEEDGEN_RULE_LLM_MIN_SCORE',
+    )
+  }
 
   const server = FeedGenerator.create({
     port: maybeInt(process.env.FEEDGEN_PORT) ?? 3000,
@@ -58,6 +60,21 @@ const run = async () => {
     feedShortname,
     keywords,
     languageAllowlist,
+    llmFilter: {
+      enabled: llmFilterConfigured,
+      apiUrl:
+        maybeStr(process.env.FEEDGEN_LLM_API_URL) ??
+        'https://api.openai.com/v1/chat/completions',
+      apiKey: llmFilterApiKey ?? '',
+      model: maybeStr(process.env.FEEDGEN_LLM_MODEL) ?? 'gpt-4o-mini',
+      timeoutMs: maybeInt(process.env.FEEDGEN_LLM_TIMEOUT_MS) ?? 5000,
+      maxInputChars: maybeInt(process.env.FEEDGEN_LLM_MAX_INPUT_CHARS) ?? 500,
+      minConfidence: maybeFloat(process.env.FEEDGEN_LLM_MIN_CONFIDENCE) ?? 0.85,
+      failOpen: maybeBool(process.env.FEEDGEN_LLM_FAIL_OPEN) ?? false,
+    },
+    ruleLlmMinScore,
+    ruleAutoAcceptScore,
+    filterVersion: FILTER_VERSION,
     maxPostAgeHours: maybeInt(process.env.FEEDGEN_MAX_POST_AGE_HOURS) ?? 48,
     maxIndexedPosts: maybeInt(process.env.FEEDGEN_MAX_INDEXED_POSTS) ?? 2500,
     hostname,
@@ -69,7 +86,11 @@ const run = async () => {
     `Feed generator listening at http://${server.cfg.listenhost}:${server.cfg.port}`,
   )
   console.log(`Active feed shortname: ${server.cfg.feedShortname}`)
-  console.log(`Keyword count: ${server.cfg.keywords.length}`)
+  console.log(`Current filter version: ${server.cfg.filterVersion}`)
+  console.log(`Custom keyword count: ${server.cfg.keywords.length}`)
+  console.log(
+    `LLM semantic filter enabled: ${server.cfg.llmFilter.enabled ? 'yes' : 'no'}`,
+  )
 }
 
 const maybeStr = (val?: string) => {
@@ -82,6 +103,20 @@ const maybeInt = (val?: string) => {
   const int = parseInt(val, 10)
   if (isNaN(int)) return undefined
   return int
+}
+
+const maybeFloat = (val?: string) => {
+  if (!val) return undefined
+  const float = parseFloat(val)
+  if (isNaN(float)) return undefined
+  return float
+}
+
+const maybeBool = (val?: string) => {
+  if (!val) return undefined
+  if (val === 'true') return true
+  if (val === 'false') return false
+  return undefined
 }
 
 const parseCsv = (val?: string, fallback: string[] = []) => {

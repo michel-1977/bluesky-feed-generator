@@ -7,6 +7,17 @@ export type AppContext = {
   cfg: Config
 }
 
+export type LlmFilterConfig = {
+  enabled: boolean
+  apiUrl: string
+  apiKey: string
+  model: string
+  timeoutMs: number
+  maxInputChars: number
+  minConfidence: number
+  failOpen: boolean
+}
+
 export type Config = {
   port: number
   listenhost: string
@@ -19,6 +30,10 @@ export type Config = {
   feedShortname: string
   keywords: string[]
   languageAllowlist: string[]
+  llmFilter: LlmFilterConfig
+  ruleLlmMinScore: number
+  ruleAutoAcceptScore: number
+  filterVersion: string
   maxPostAgeHours: number
   maxIndexedPosts: number
 }
