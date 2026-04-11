@@ -62,6 +62,7 @@ export abstract class FirehoseSubscriptionBase {
       .set({ cursor })
       .where('service', '=', this.service)
       .execute()
+    this.db.scheduleBackup()
   }
 
   async getCursor(): Promise<{ cursor?: number }> {

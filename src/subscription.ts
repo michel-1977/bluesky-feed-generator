@@ -83,8 +83,14 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
 
     await this.bumpCounters(counters)
 
-    if (evt.seq % 200 === 0) {
+    const shouldPrune = postsToCreate.length > 0 || evt.seq % 200 === 0
+
+    if (shouldPrune) {
       await this.prunePosts()
+    }
+
+    if (postsToDelete.length > 0 || postsToCreate.length > 0 || hasCounterDelta(counters) || shouldPrune) {
+      this.db.scheduleBackup()
     }
   }
 
@@ -170,7 +176,6 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
       .selectFrom('post')
       .select('uri')
       .where('filterVersion', '=', this.cfg.filterVersion)
-      .orderBy('score', 'desc')
       .orderBy('indexedAt', 'desc')
       .orderBy('cid', 'desc')
       .limit(2147483647)
@@ -251,6 +256,10 @@ const applyCounterDelta = (
   for (const [metric, value] of entries) {
     counters[metric] += value
   }
+}
+
+const hasCounterDelta = (counters: FilterMetricCounters) => {
+  return Object.values(counters).some((value) => value > 0)
 }
 
 const compactReason = (reason: string) => {

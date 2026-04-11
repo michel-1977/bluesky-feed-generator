@@ -95,4 +95,65 @@ describe('FirehoseSubscription.evaluateCreate', () => {
     expect(result.metricDeltas.posts_llm_failures).toBe(1)
     expect(result.metricDeltas.posts_rejected_llm).toBe(1)
   })
+
+  it('retains only the newest accepted posts when maxIndexedPosts is exceeded', async () => {
+    db = await createTestDb()
+    const cfg = createTestConfig({
+      maxIndexedPosts: 2,
+    })
+
+    const subscription = new FirehoseSubscription(db, cfg.subscriptionEndpoint, cfg)
+
+    await db
+      .insertInto('post')
+      .values([
+        {
+          uri: 'at://oldest',
+          cid: 'cid-1',
+          author: 'did:plc:a',
+          text: 'oldest',
+          langs: 'es',
+          indexedAt: '2026-04-11T10:00:00.000Z',
+          score: 100,
+          sourceTier: 'trusted',
+          decisionReason: 'rule_accept:trusted:test',
+          filterVersion: cfg.filterVersion,
+        },
+        {
+          uri: 'at://middle',
+          cid: 'cid-2',
+          author: 'did:plc:b',
+          text: 'middle',
+          langs: 'es',
+          indexedAt: '2026-04-11T11:00:00.000Z',
+          score: 80,
+          sourceTier: 'boosted',
+          decisionReason: 'rule_accept:boosted:test',
+          filterVersion: cfg.filterVersion,
+        },
+        {
+          uri: 'at://newest',
+          cid: 'cid-3',
+          author: 'did:plc:c',
+          text: 'newest',
+          langs: 'es',
+          indexedAt: '2026-04-11T12:00:00.000Z',
+          score: 60,
+          sourceTier: 'neutral',
+          decisionReason: 'rule_accept:neutral:test',
+          filterVersion: cfg.filterVersion,
+        },
+      ])
+      .execute()
+
+    await (subscription as unknown as { prunePosts(): Promise<void> }).prunePosts()
+
+    const rows = await db
+      .selectFrom('post')
+      .select(['uri', 'indexedAt'])
+      .orderBy('indexedAt', 'asc')
+      .execute()
+
+    expect(rows.map((row) => row.uri)).toEqual(['at://middle', 'at://newest'])
+  })
 })

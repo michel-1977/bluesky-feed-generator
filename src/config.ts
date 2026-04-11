@@ -23,6 +23,8 @@ export type Config = {
   listenhost: string
   hostname: string
   sqliteLocation: string
+  sqliteBackupLocation?: string
+  sqliteBackupIntervalMs: number
   subscriptionEndpoint: string
   serviceDid: string
   publisherDid: string

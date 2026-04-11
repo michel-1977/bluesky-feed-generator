@@ -139,8 +139,10 @@ Only the current `filterVersion` is served, so stale noisy rows from older class
 ### Retention
 
 - `FEEDGEN_MAX_POST_AGE_HOURS`: drops old rows
-- `FEEDGEN_MAX_INDEXED_POSTS`: caps persisted current-version rows to the highest-scoring recent posts
-- `FEEDGEN_SQLITE_LOCATION`: `:memory:` is ephemeral; use a file path such as `db.sqlite` for persistence
+- `FEEDGEN_MAX_INDEXED_POSTS`: caps persisted current-version rows to the newest accepted posts, evicting the oldest rows first
+- `FEEDGEN_SQLITE_LOCATION`: local runtime SQLite path such as `db.sqlite`
+- `FEEDGEN_SQLITE_BACKUP_LOCATION`: optional persisted copy path, for example `/app/data/db.sqlite` on a mounted Azure Files share
+- `FEEDGEN_SQLITE_BACKUP_INTERVAL_MS`: debounce interval for flushing dirty SQLite state to the persisted copy
 
 ## Useful Commands
 
