@@ -10,6 +10,7 @@ import {
   SPAIN_ROAD_PATTERN,
   STRONG_TRANSPORT_INCIDENT_PHRASES,
   TRUSTED_LINK_DOMAINS,
+  WARNING_CUES,
 } from './spec'
 
 export type SourceTier = 'trusted' | 'boosted' | 'neutral'
@@ -71,6 +72,7 @@ export const classifyCandidatePost = (
   const mobilityHits = findMatches(normalizedText, MOBILITY_TERMS)
   const incidentHits = findMatches(normalizedText, INCIDENT_TERMS)
   const hazardHits = findMatches(normalizedText, HAZARD_TERMS)
+  const warningCueHits = findMatches(normalizedText, WARNING_CUES)
   const negativeContextHits = findMatches(normalizedText, NEGATIVE_CONTEXT_PHRASES)
   const geographyHits = findMatches(normalizedText, SPAIN_GEO_SIGNALS)
   const institutionHits = findMatches(normalizedText, SPAIN_INSTITUTION_SIGNALS)
@@ -119,6 +121,7 @@ export const classifyCandidatePost = (
       (trustedDomainHits.length > 0 ? 12 : 0) +
       (spanishDomainHits.length > 0 ? 6 : 0) +
       (sourceTier === 'trusted' ? 30 : sourceTier === 'boosted' ? 20 : 0) +
+      getOfficialWarningBoost(sourceTier, hazardHits.length, mobilityHits.length, warningCueHits.length) +
       Math.min(8, extraKeywordHits.length * 2) -
       Math.min(18, negativeContextHits.length * 9),
   )
@@ -197,6 +200,20 @@ const buildDecisionReason = (
   const strongestSignal =
     signals.strongPhraseHits[0] ?? signals.institutionHits[0] ?? signals.geographyHits[0]
   return `${prefix}:${signals.sourceTier}${strongestSignal ? `:${strongestSignal}` : ''}`
+}
+
+const getOfficialWarningBoost = (
+  sourceTier: SourceTier,
+  hazardHitCount: number,
+  mobilityHitCount: number,
+  warningCueHitCount: number,
+) => {
+  if (sourceTier === 'neutral') return 0
+  if (hazardHitCount === 0 || mobilityHitCount === 0 || warningCueHitCount === 0) {
+    return 0
+  }
+
+  return 10
 }
 
 const findMatches = (value: string, phrases: readonly string[]) => {

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+ï»¿import { afterEach, describe, expect, it } from 'vitest'
 import { FirehoseSubscription } from '../src/subscription'
 import { LlmReviewer } from '../src/util/llm-filter'
 import { Database } from '../src/db'
@@ -25,7 +25,7 @@ describe('FirehoseSubscription.evaluateCreate', () => {
         minConfidence: 0.85,
         failOpen: false,
       },
-      ruleAutoAcceptScore: 100,
+      ruleAutoAcceptScore: 101,
     })
 
     const llmReviewer: LlmReviewer = {
@@ -42,7 +42,7 @@ describe('FirehoseSubscription.evaluateCreate', () => {
       uri: 'at://candidate',
       cid: 'cid-1',
       author: 'did:plc:test',
-      text: 'Atropello en Calahorra con corte parcial y desvíos. Más info en www.larioja.org/emergencias-112',
+      text: 'Atropello en Calahorra con corte parcial y desvios. Mas info en www.larioja.org/emergencias-112',
       langs: ['es'],
     })
 
@@ -69,7 +69,7 @@ describe('FirehoseSubscription.evaluateCreate', () => {
         minConfidence: 0.85,
         failOpen: false,
       },
-      ruleAutoAcceptScore: 100,
+      ruleAutoAcceptScore: 101,
     })
 
     const llmReviewer: LlmReviewer = {
@@ -86,7 +86,7 @@ describe('FirehoseSubscription.evaluateCreate', () => {
       uri: 'at://candidate',
       cid: 'cid-2',
       author: 'did:plc:test',
-      text: 'Atropello en Calahorra con corte parcial y desvíos. Más info en www.larioja.org/emergencias-112',
+      text: 'Atropello en Calahorra con corte parcial y desvios. Mas info en www.larioja.org/emergencias-112',
       langs: ['es'],
     })
 
@@ -155,5 +155,58 @@ describe('FirehoseSubscription.evaluateCreate', () => {
       .execute()
 
     expect(rows.map((row) => row.uri)).toEqual(['at://middle', 'at://newest'])
+  })
+
+  it('does not delete posts by age when age pruning is disabled', async () => {
+    db = await createTestDb()
+    const cfg = createTestConfig({
+      maxPostAgeHours: 0,
+      maxIndexedPosts: 10,
+    })
+
+    const subscription = new FirehoseSubscription(db, cfg.subscriptionEndpoint, cfg)
+
+    await db
+      .insertInto('post')
+      .values([
+        {
+          uri: 'at://old-alert',
+          cid: 'cid-old',
+          author: 'did:plc:a',
+          text: 'old alert',
+          langs: 'es',
+          indexedAt: '2026-04-01T10:00:00.000Z',
+          score: 95,
+          sourceTier: 'trusted',
+          decisionReason: 'rule_accept:trusted:test',
+          filterVersion: cfg.filterVersion,
+        },
+        {
+          uri: 'at://fresh-alert',
+          cid: 'cid-fresh',
+          author: 'did:plc:b',
+          text: 'fresh alert',
+          langs: 'es',
+          indexedAt: '2026-04-15T10:00:00.000Z',
+          score: 90,
+          sourceTier: 'trusted',
+          decisionReason: 'rule_accept:trusted:test',
+          filterVersion: cfg.filterVersion,
+        },
+      ])
+      .execute()
+
+    await (subscription as unknown as { prunePosts(): Promise<void> }).prunePosts()
+
+    const rows = await db
+      .selectFrom('post')
+      .select('uri')
+      .orderBy('indexedAt', 'asc')
+      .execute()
+
+    expect(rows.map((row) => row.uri)).toEqual([
+      'at://old-alert',
+      'at://fresh-alert',
+    ])
   })
 })

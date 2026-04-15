@@ -159,14 +159,16 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
       .where('filterVersion', '!=', this.cfg.filterVersion)
       .execute()
 
-    const cutoff = new Date(
-      Date.now() - this.cfg.maxPostAgeHours * 60 * 60 * 1000,
-    ).toISOString()
+    if (this.cfg.maxPostAgeHours > 0) {
+      const cutoff = new Date(
+        Date.now() - this.cfg.maxPostAgeHours * 60 * 60 * 1000,
+      ).toISOString()
 
-    await this.db
-      .deleteFrom('post')
-      .where('indexedAt', '<', cutoff)
-      .execute()
+      await this.db
+        .deleteFrom('post')
+        .where('indexedAt', '<', cutoff)
+        .execute()
+    }
 
     if (this.cfg.maxIndexedPosts <= 0) {
       return

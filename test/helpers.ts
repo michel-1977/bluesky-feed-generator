@@ -37,7 +37,7 @@ export const createTestConfig = (
   ruleLlmMinScore: 60,
   ruleAutoAcceptScore: 85,
   filterVersion: FILTER_VERSION,
-  maxPostAgeHours: 48,
+  maxPostAgeHours: 0,
   maxIndexedPosts: 2500,
   ...overrides,
 })

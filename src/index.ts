@@ -78,7 +78,7 @@ const run = async () => {
     ruleLlmMinScore,
     ruleAutoAcceptScore,
     filterVersion: FILTER_VERSION,
-    maxPostAgeHours: maybeInt(process.env.FEEDGEN_MAX_POST_AGE_HOURS) ?? 48,
+    maxPostAgeHours: maybeInt(process.env.FEEDGEN_MAX_POST_AGE_HOURS) ?? 0,
     maxIndexedPosts: maybeInt(process.env.FEEDGEN_MAX_INDEXED_POSTS) ?? 2500,
     hostname,
     serviceDid,

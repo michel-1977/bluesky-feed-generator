@@ -119,8 +119,13 @@ export const MOBILITY_TERMS = [
   'desplazarte',
   'desplazarse',
   'desplazamiento',
+  'desplazamientos',
   'moverse',
   'movilidad',
+  'viaje',
+  'viajes',
+  'trayecto',
+  'trayectos',
   'tren',
   'ferrocarril',
   'cercanias',
@@ -172,6 +177,8 @@ export const HAZARD_TERMS = [
   'nieve',
   'nevadas',
   'hielo',
+  'niebla',
+  'nieblas',
   'inundacion',
   'inundaciones',
   'riada',
@@ -179,10 +186,23 @@ export const HAZARD_TERMS = [
   'deslizamiento',
   'desprendimiento',
   'viento',
+  'racha',
+  'rachas',
   'ventisca',
   'vendaval',
+  'temporal',
   'incendio',
   'humo',
+] as const
+
+export const WARNING_CUES = [
+  'aviso',
+  'avisos',
+  'alerta',
+  'alertas',
+  'precaucion',
+  'precauciones',
+  'prudencia',
 ] as const
 
 export const STRONG_TRANSPORT_INCIDENT_PHRASES = [
@@ -210,6 +230,19 @@ export const STRONG_TRANSPORT_INCIDENT_PHRASES = [
   'autovia cortada',
   'autopista cortada',
   'desplazate con precaucion',
+  'evita desplazamientos',
+  'eviten desplazamientos',
+  'evitar desplazamientos',
+  'precaucion en carretera',
+  'extrema la precaucion en carretera',
+  'circulacion suspendida',
+  'afecta a la circulacion',
+  'afectan a la circulacion',
+  'dificulta la circulacion',
+  'dificultan la circulacion',
+  'complicaciones en la circulacion',
+  'vias intransitables',
+  'carreteras intransitables',
 ] as const
 
 export const HARD_DENY_PHRASES = [
