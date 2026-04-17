@@ -1,0 +1,8 @@
+.env
+.git
+.start.err
+.start.log
+db.sqlite
+dist
+node_modules
+test

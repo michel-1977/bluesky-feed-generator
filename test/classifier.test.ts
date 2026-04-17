@@ -88,4 +88,27 @@ describe('classifyCandidatePost', () => {
     })
     expect(result.score).toBeGreaterThanOrEqual(85)
   })
+
+  it('accepts clear neutral local reports with a strong incident phrase and Spain-local signal', () => {
+    const result = classifyCandidatePost({
+      ...baseInput,
+      text: 'Carretera cortada en la A-8 a la altura de Bilbao por accidente multiple. Desvios habilitados.',
+    })
+
+    expect(result).toMatchObject({
+      action: 'accept',
+      sourceTier: 'neutral',
+      filterVersion: FILTER_VERSION,
+    })
+  })
+
+  it('rejects vague Spain weather chatter when mobility impact is not explicit', () => {
+    const result = classifyCandidatePost({
+      ...baseInput,
+      text: 'Lluvias y tormenta esta tarde en Madrid. Mucha precaucion por el tiempo.',
+    })
+
+    expect(result.action).toBe('reject')
+    expect(result.rejectMetric).toBe('posts_rejected_missing_mobility')
+  })
 })

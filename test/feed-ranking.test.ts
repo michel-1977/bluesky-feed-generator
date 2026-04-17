@@ -11,7 +11,7 @@ describe('mobility-risk feed handler', () => {
     db = undefined
   })
 
-  it('orders by score, then recency, and hides legacy filter versions', async () => {
+  it('orders by recency first, then score, and hides legacy filter versions', async () => {
     db = await createTestDb()
     const cfg = createTestConfig()
 
@@ -75,8 +75,8 @@ describe('mobility-risk feed handler', () => {
     )
 
     expect(firstPage.feed.map((item) => item.post)).toEqual([
+      'at://post-3',
       'at://post-1',
-      'at://post-2',
     ])
     expect(firstPage.cursor).toBeTruthy()
 
@@ -85,6 +85,6 @@ describe('mobility-risk feed handler', () => {
       { feed: 'at://ignored', limit: 2, cursor: firstPage.cursor },
     )
 
-    expect(secondPage.feed.map((item) => item.post)).toEqual(['at://post-3'])
+    expect(secondPage.feed.map((item) => item.post)).toEqual(['at://post-2'])
   })
 })

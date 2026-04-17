@@ -115,6 +115,7 @@ export const MOBILITY_TERMS = [
   'acceso',
   'desvio',
   'desplaza',
+  'desplazas',
   'desplazate',
   'desplazarte',
   'desplazarse',

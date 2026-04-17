@@ -110,6 +110,12 @@ export const classifyCandidatePost = (
     return reject('posts_rejected_missing_spain', 'missing_spain_signal')
   }
 
+  const hasClearNeutralLocalReport =
+    sourceTier === 'neutral' &&
+    strongPhraseHits.length > 0 &&
+    (geographyHits.length > 0 || spanishDomainHits.length > 0 || hasRoadPattern) &&
+    negativeContextHits.length === 0
+
   const score = clampScore(
     (strongPhraseHits.length > 0 ? 48 : 28) +
       Math.min(14, mobilityHits.length * 4) +
@@ -125,6 +131,21 @@ export const classifyCandidatePost = (
       Math.min(8, extraKeywordHits.length * 2) -
       Math.min(18, negativeContextHits.length * 9),
   )
+
+  if (hasClearNeutralLocalReport) {
+    return {
+      action: 'accept',
+      score,
+      sourceTier,
+      filterVersion: FILTER_VERSION,
+      decisionReason: buildDecisionReason('rule_accept', {
+        sourceTier,
+        strongPhraseHits,
+        institutionHits,
+        geographyHits,
+      }),
+    }
+  }
 
   if (score >= input.ruleAutoAcceptScore && negativeContextHits.length === 0) {
     return {
@@ -217,7 +238,7 @@ const getOfficialWarningBoost = (
 }
 
 const findMatches = (value: string, phrases: readonly string[]) => {
-  return phrases.filter((phrase) => phrase && value.includes(phrase))
+  return phrases.filter((phrase) => phrase && containsPhrase(value, phrase))
 }
 
 const extractDomains = (value: string) => {
@@ -249,4 +270,26 @@ export const normalizeForMatch = (value: string) => {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
+}
+
+const containsPhrase = (value: string, phrase: string) => {
+  let index = value.indexOf(phrase)
+
+  while (index !== -1) {
+    const before = index === 0 ? '' : value[index - 1]
+    const afterIndex = index + phrase.length
+    const after = afterIndex >= value.length ? '' : value[afterIndex]
+
+    if (isBoundaryChar(before) && isBoundaryChar(after)) {
+      return true
+    }
+
+    index = value.indexOf(phrase, index + 1)
+  }
+
+  return false
+}
+
+const isBoundaryChar = (value: string) => {
+  return value === '' || /[^a-z0-9]/.test(value)
 }

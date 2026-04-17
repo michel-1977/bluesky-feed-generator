@@ -8,8 +8,9 @@ It ingests the Bluesky firehose, applies a precision-first classifier, stores ac
 - TypeScript feed generator server with ATProto lexicons
 - Firehose subscription and SQLite indexing
 - Precision-first mobility classifier with trusted-source boosts and optional LLM review
-- Ranked feed output ordered by score, then recency
+- Ranked feed output ordered by recency, then score
 - Publish/unpublish scripts for `app.bsky.feed.generator` records
+- Repo-managed Azure Container Apps deployment script with Azure Files backup
 - Metrics endpoint and regression tests
 
 For setup prerequisites, see `REQUIREMENTS.md`.
@@ -75,6 +76,27 @@ The generator exposes:
 - `/xrpc/app.bsky.feed.getFeedSkeleton`
 - `/metrics`
 
+The supported Azure release path is the repo-managed PowerShell script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy-azure.ps1
+```
+
+The script is designed for the existing Azure target:
+
+- Container App: `app-bluesky-feed`
+- Resource group: `rg-bluesky-feed`
+- Registry: `ca7300480f77acr`
+- Azure Files share: `feeddb`
+
+History-preserving guarantees during deploy:
+
+- creates a timestamped Azure Files backup copy of the persisted `db.sqlite`
+- updates only the container image on the existing Container App
+- keeps the existing env vars, secrets, hostname, publisher DID, and mounted Azure Files volume
+- keeps single-revision / single-replica settings so two firehose consumers do not race on the same SQLite state
+- prints the previous image as the rollback target after the deploy completes
+
 ## Feed Behavior
 
 Accepted posts must satisfy all of the following:
@@ -88,6 +110,10 @@ Accepted posts must satisfy all of the following:
    - `< FEEDGEN_RULE_LLM_MIN_SCORE`: reject
    - `FEEDGEN_RULE_LLM_MIN_SCORE .. FEEDGEN_RULE_AUTO_ACCEPT_SCORE-1`: LLM review if enabled, otherwise reject
    - `>= FEEDGEN_RULE_AUTO_ACCEPT_SCORE`: auto-accept if no negative-context hit
+
+There is one additional fast path for clearer local reporting:
+
+- neutral sources are accepted without a trusted-source boost when they include a strong transport-incident phrase plus a Spain-local signal (`geography`, `road pattern`, or `.es` domain) and no negative-context hit
 
 The checked-in classifier spec also contains:
 
@@ -114,8 +140,8 @@ Accepted posts are stored with:
 
 Feed ranking is:
 
-1. `score desc`
-2. `indexedAt desc`
+1. `indexedAt desc`
+2. `score desc`
 3. `cid desc`
 
 Only the current `filterVersion` is served, so stale noisy rows from older classifier versions are hidden immediately after rollout.
@@ -144,12 +170,28 @@ Only the current `filterVersion` is served, so stale noisy rows from older class
 - `FEEDGEN_SQLITE_BACKUP_LOCATION`: optional persisted copy path, for example `/app/data/db.sqlite` on a mounted Azure Files share
 - `FEEDGEN_SQLITE_BACKUP_INTERVAL_MS`: debounce interval for flushing dirty SQLite state to the persisted copy
 
+### Azure Rollout Notes
+
+The deploy script performs this sequence:
+
+1. Verifies Azure login and the expected subscription/resource names
+2. Copies the mounted Azure Files SQLite file to `feeddb/backups/db-<timestamp>.sqlite`
+3. Builds a new image in ACR with a `release-<gitsha>-<timestamp>` tag
+4. Updates only the image on `app-bluesky-feed`
+5. Waits for the new revision to become ready and healthy
+6. Smoke-tests `/metrics` and the feed endpoint
+7. Prints the previous image and a rollback command
+
+Rollback is an image swap back to the previous tag printed by the script. No Git history rewrite or SQLite wipe is part of the release flow.
+
 ## Useful Commands
 
 ```powershell
 npm.cmd run build
 npm.cmd run test
 npm.cmd run start
+npm.cmd run start:prod
 npm.cmd run publishFeed
 npm.cmd run unpublishFeed
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy-azure.ps1
 ```

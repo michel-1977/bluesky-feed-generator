@@ -12,22 +12,22 @@ export const handler = async (ctx: AppContext, params: QueryParams) => {
     .selectFrom('post')
     .select(['uri', 'cid', 'indexedAt', 'score'])
     .where('filterVersion', '=', ctx.cfg.filterVersion)
-    .orderBy('score', 'desc')
     .orderBy('indexedAt', 'desc')
+    .orderBy('score', 'desc')
     .orderBy('cid', 'desc')
     .limit(limit)
 
   if (cursor) {
     builder = builder.where((eb) =>
       eb.or([
-        eb('post.score', '<', cursor.score),
+        eb('post.indexedAt', '<', cursor.indexedAt),
         eb.and([
-          eb('post.score', '=', cursor.score),
-          eb('post.indexedAt', '<', cursor.indexedAt),
+          eb('post.indexedAt', '=', cursor.indexedAt),
+          eb('post.score', '<', cursor.score),
         ]),
         eb.and([
-          eb('post.score', '=', cursor.score),
           eb('post.indexedAt', '=', cursor.indexedAt),
+          eb('post.score', '=', cursor.score),
           eb('post.cid', '<', cursor.cid),
         ]),
       ]),

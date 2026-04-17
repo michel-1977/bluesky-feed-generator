@@ -209,4 +209,23 @@ describe('FirehoseSubscription.evaluateCreate', () => {
       'at://fresh-alert',
     ])
   })
+
+  it('persists a cursor row even when the service has not been seen before', async () => {
+    db = await createTestDb()
+    const cfg = createTestConfig()
+    const subscription = new FirehoseSubscription(db, cfg.subscriptionEndpoint, cfg)
+
+    await subscription.updateCursor(120)
+
+    const row = await db
+      .selectFrom('sub_state')
+      .selectAll()
+      .where('service', '=', cfg.subscriptionEndpoint)
+      .executeTakeFirst()
+
+    expect(row).toEqual({
+      service: cfg.subscriptionEndpoint,
+      cursor: 120,
+    })
+  })
 })

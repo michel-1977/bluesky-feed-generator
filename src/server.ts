@@ -17,6 +17,8 @@ export class FeedGenerator {
   public db: Database
   public firehose: FirehoseSubscription
   public cfg: Config
+  private firehoseTask?: Promise<void>
+  private stopTask?: Promise<void>
 
   constructor(
     app: express.Application,
@@ -71,10 +73,38 @@ export class FeedGenerator {
     this.db.scheduleBackup()
     await this.db.flushBackup()
     await this.firehose.init()
-    this.firehose.run(this.cfg.subscriptionReconnectDelay)
+    this.firehoseTask = this.firehose.run(this.cfg.subscriptionReconnectDelay)
     this.server = this.app.listen(this.cfg.port, this.cfg.listenhost)
     await events.once(this.server, 'listening')
     return this.server
+  }
+
+  async stop(): Promise<void> {
+    if (this.stopTask) {
+      return this.stopTask
+    }
+
+    this.stopTask = (async () => {
+      this.firehose.stop()
+      await this.firehoseTask?.catch(() => undefined)
+
+      if (this.server && this.server.listening) {
+        await new Promise<void>((resolve, reject) => {
+          this.server?.close((err) => {
+            if (err) {
+              reject(err)
+              return
+            }
+
+            resolve()
+          })
+        })
+      }
+
+      await this.db.destroy()
+    })()
+
+    return this.stopTask
   }
 }
 

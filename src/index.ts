@@ -84,6 +84,27 @@ const run = async () => {
     serviceDid,
   })
 
+  let shuttingDown = false
+  const shutdown = async (signal: string) => {
+    if (shuttingDown) return
+    shuttingDown = true
+    console.log(`Received ${signal}. Shutting down feed generator.`)
+
+    try {
+      await server.stop()
+      process.exit(0)
+    } catch (err) {
+      console.error('Failed to stop feed generator cleanly', err)
+      process.exit(1)
+    }
+  }
+
+  for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+    process.once(signal, () => {
+      void shutdown(signal)
+    })
+  }
+
   await server.start()
   console.log(
     `Feed generator listening at http://${server.cfg.listenhost}:${server.cfg.port}`,

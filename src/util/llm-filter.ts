@@ -92,27 +92,21 @@ export class MobilityRiskLlmFilter implements LlmReviewer {
 
     try {
       const apiUrl = normalizeApiUrl(this.cfg.apiUrl)
+      const requestBody = buildRequestBody(apiUrl, this.cfg.model, text, langs)
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: buildHeaders(apiUrl, this.cfg.apiKey),
-        body: JSON.stringify({
-          model: this.cfg.model,
-          temperature: 0,
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            {
-              role: 'user',
-              content: `Text: ${text}\nLangs: ${
-                langs.length > 0 ? langs.join(', ') : 'unknown'
-              }`,
-            },
-          ],
-        }),
+        body: JSON.stringify(requestBody),
         signal: controller.signal,
       })
 
       if (!response.ok) {
-        throw new Error(`LLM request failed with HTTP ${response.status}`)
+        const errorBody = compactErrorBody(await response.text())
+        throw new Error(
+          `LLM request failed with HTTP ${response.status}${
+            errorBody ? `: ${errorBody}` : ''
+          }`,
+        )
       }
 
       const payload = (await response.json()) as OpenAiChatResponse
@@ -140,6 +134,32 @@ const buildHeaders = (apiUrl: string, apiKey: string) => {
   }
 
   return headers
+}
+
+const buildRequestBody = (
+  apiUrl: string,
+  model: string,
+  text: string,
+  langs: string[],
+) => {
+  const body: Record<string, unknown> = {
+    model,
+    messages: [
+      { role: 'system', content: SYSTEM_PROMPT },
+      {
+        role: 'user',
+        content: `Text: ${text}\nLangs: ${
+          langs.length > 0 ? langs.join(', ') : 'unknown'
+        }`,
+      },
+    ],
+  }
+
+  if (!shouldOmitTemperature(apiUrl, model)) {
+    body.temperature = 0
+  }
+
+  return body
 }
 
 const normalizeApiUrl = (rawApiUrl: string) => {
@@ -170,6 +190,10 @@ const normalizeApiUrl = (rawApiUrl: string) => {
 
 const isAzureOpenAiUrl = (value: string) => {
   return value.includes('.openai.azure.com')
+}
+
+const shouldOmitTemperature = (apiUrl: string, model: string) => {
+  return isAzureOpenAiUrl(apiUrl) && /^gpt-5\b/i.test(model.trim())
 }
 
 const parseDecision = (rawContent: string): LlmDecision => {
@@ -213,4 +237,10 @@ const clampConfidence = (value: number): number => {
   if (value < 0) return 0
   if (value > 1) return 1
   return value
+}
+
+const compactErrorBody = (value: string) => {
+  const trimmed = value.replace(/\s+/g, ' ').trim()
+  if (!trimmed) return ''
+  return trimmed.slice(0, 240)
 }

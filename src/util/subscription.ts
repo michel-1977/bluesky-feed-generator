@@ -14,12 +14,15 @@ import {
 import { Database } from '../db'
 
 export abstract class FirehoseSubscriptionBase {
-  public sub: Subscription<RepoEvent>
+  public sub: AsyncIterable<RepoEvent>
+  private abortController = new AbortController()
+  private stopped = false
 
   constructor(public db: Database, public service: string) {
     this.sub = new Subscription({
       service: service,
       method: ids.ComAtprotoSyncSubscribeRepos,
+      signal: this.abortController.signal,
       getParams: () => this.getCursor(),
       validate: (value: unknown) => {
         try {
@@ -39,18 +42,28 @@ export abstract class FirehoseSubscriptionBase {
   async run(subscriptionReconnectDelay: number) {
     try {
       for await (const evt of this.sub) {
-        this.handleEvent(evt).catch((err) => {
+        try {
+          await this.handleEvent(evt)
+        } catch (err) {
           console.error('repo subscription could not handle message', err)
-        })
-        // update stored cursor every 20 events or so
+          throw err
+        }
+
         if (isCommit(evt) && evt.seq % 20 === 0) {
           await this.updateCursor(evt.seq)
         }
       }
     } catch (err) {
+      if (this.stopped) {
+        return
+      }
       console.error('repo subscription errored', err)
       setTimeout(
-        () => this.run(subscriptionReconnectDelay),
+        () => {
+          if (!this.stopped) {
+            void this.run(subscriptionReconnectDelay)
+          }
+        },
         subscriptionReconnectDelay,
       )
     }
@@ -58,9 +71,13 @@ export abstract class FirehoseSubscriptionBase {
 
   async updateCursor(cursor: number) {
     await this.db
-      .updateTable('sub_state')
-      .set({ cursor })
-      .where('service', '=', this.service)
+      .insertInto('sub_state')
+      .values({ service: this.service, cursor })
+      .onConflict((oc) =>
+        oc.column('service').doUpdateSet({
+          cursor,
+        }),
+      )
       .execute()
     this.db.scheduleBackup()
   }
@@ -72,6 +89,12 @@ export abstract class FirehoseSubscriptionBase {
       .where('service', '=', this.service)
       .executeTakeFirst()
     return res ? { cursor: res.cursor } : {}
+  }
+
+  stop() {
+    if (this.stopped) return
+    this.stopped = true
+    this.abortController.abort(new Error('subscription_stopped'))
   }
 }
 
