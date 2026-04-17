@@ -107,13 +107,12 @@ Accepted posts must satisfy all of the following:
    - co-occurring mobility and disruption/hazard signals
 3. Include a Spain signal such as a Spanish institution, geography, road pattern, or trusted domain
 4. Reach a rule score band:
-   - `< FEEDGEN_RULE_LLM_MIN_SCORE`: reject
-   - `FEEDGEN_RULE_LLM_MIN_SCORE .. FEEDGEN_RULE_AUTO_ACCEPT_SCORE-1`: LLM review if enabled, otherwise reject
-   - `>= FEEDGEN_RULE_AUTO_ACCEPT_SCORE`: auto-accept if no negative-context hit
+  - `< FEEDGEN_RULE_LLM_MIN_SCORE`: reject
+  - `>= FEEDGEN_RULE_LLM_MIN_SCORE`: LLM review if enabled, otherwise reject
 
-There is one additional fast path for clearer local reporting:
+There is one additional rule path for clearer local reporting:
 
-- neutral sources are accepted without a trusted-source boost when they include a strong transport-incident phrase plus a Spain-local signal (`geography`, `road pattern`, or `.es` domain) and no negative-context hit
+- neutral sources are sent to LLM review when they include a strong transport-incident phrase plus a Spain-local signal (`geography`, `road pattern`, or `.es` domain) and no negative-context hit
 
 The checked-in classifier spec also contains:
 

@@ -8,7 +8,7 @@ const baseInput = {
   languageAllowlist: ['es'],
   extraKeywords: [],
   trustedAuthorDids: new Set<string>(),
-  ruleLlmMinScore: 60,
+  ruleLlmMinScore: 70,
   ruleAutoAcceptScore: 85,
 }
 
@@ -43,7 +43,7 @@ describe('classifyCandidatePost', () => {
     expect(result.rejectMetric).toBe('posts_rejected_hard_deny')
   })
 
-  it('accepts trusted weather alerts that explicitly affect travel in Spain', () => {
+  it('sends trusted weather alerts that explicitly affect travel in Spain to LLM review', () => {
     const result = classifyCandidatePost({
       ...baseInput,
       authorDid: 'did:plc:trusted',
@@ -52,28 +52,28 @@ describe('classifyCandidatePost', () => {
     })
 
     expect(result).toMatchObject({
-      action: 'accept',
+      action: 'review',
       sourceTier: 'trusted',
       filterVersion: FILTER_VERSION,
     })
     expect(result.score).toBeGreaterThanOrEqual(85)
   })
 
-  it('accepts Spain-local incident reports like SOS Rioja atropellos', () => {
+  it('sends Spain-local incident reports like SOS Rioja atropellos to LLM review', () => {
     const result = classifyCandidatePost({
       ...baseInput,
       text: 'Despues de unos dias de mucho ajetreo toca volver a la cruda realidad, el 8 de abril se produjo el 28o atropello informado por SOSRioja en el ano, un senor de 82 anos en Calahorra que se derivo al Hospital de esa localidad www.larioja.org/emergencias-112',
     })
 
     expect(result).toMatchObject({
-      action: 'accept',
+      action: 'review',
       sourceTier: 'boosted',
       filterVersion: FILTER_VERSION,
     })
     expect(result.score).toBeGreaterThanOrEqual(85)
   })
 
-  it('accepts trusted weather warnings that advise avoiding travel', () => {
+  it('sends trusted weather warnings that advise avoiding travel to LLM review', () => {
     const result = classifyCandidatePost({
       ...baseInput,
       authorDid: 'did:plc:trusted',
@@ -82,24 +82,38 @@ describe('classifyCandidatePost', () => {
     })
 
     expect(result).toMatchObject({
-      action: 'accept',
+      action: 'review',
       sourceTier: 'trusted',
       filterVersion: FILTER_VERSION,
     })
     expect(result.score).toBeGreaterThanOrEqual(85)
   })
 
-  it('accepts clear neutral local reports with a strong incident phrase and Spain-local signal', () => {
+  it('sends clear neutral local reports with a strong incident phrase and Spain-local signal to LLM review', () => {
     const result = classifyCandidatePost({
       ...baseInput,
       text: 'Carretera cortada en la A-8 a la altura de Bilbao por accidente multiple. Desvios habilitados.',
     })
 
     expect(result).toMatchObject({
-      action: 'accept',
+      action: 'review',
       sourceTier: 'neutral',
       filterVersion: FILTER_VERSION,
     })
+  })
+
+  it('sends the political atropello false positive to LLM review instead of rule accept', () => {
+    const result = classifyCandidatePost({
+      ...baseInput,
+      text: 'Lo del pasado martes en el Pleno de Coslada no es solo un atropello politico: es un ataque a nuestros derechos. En Mas Madrid Coslada no vamos a tolerarlo.',
+    })
+
+    expect(result).toMatchObject({
+      action: 'review',
+      sourceTier: 'neutral',
+      filterVersion: FILTER_VERSION,
+    })
+    expect(result.score).toBeLessThan(70)
   })
 
   it('rejects vague Spain weather chatter when mobility impact is not explicit', () => {

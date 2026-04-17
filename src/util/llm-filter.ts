@@ -36,7 +36,7 @@ Reject these failure classes:
 - medical topics such as "retencion de liquidos" or "atencion medica"
 - sports commentary such as "desastre de temporada"
 - generic politics, diplomacy, or crisis language without direct transport impact
-- general danger or weather commentary if mobility impact is not explicit
+- general danger or weather commentary if the risk level is low and mobility impact is not explicit
 confidence must be a number from 0 to 1.`
 
 export class MobilityRiskLlmFilter implements LlmReviewer {

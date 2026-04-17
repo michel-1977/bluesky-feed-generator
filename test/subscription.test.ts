@@ -228,4 +228,33 @@ describe('FirehoseSubscription.evaluateCreate', () => {
       cursor: 120,
     })
   })
+
+  it('rejects would-be positives when LLM filtering is disabled', async () => {
+    db = await createTestDb()
+    const cfg = createTestConfig({
+      llmFilter: {
+        enabled: false,
+        apiUrl: 'https://api.openai.com/v1/chat/completions',
+        apiKey: '',
+        model: 'gpt-4o-mini',
+        timeoutMs: 5000,
+        maxInputChars: 500,
+        minConfidence: 0.85,
+        failOpen: false,
+      },
+    })
+
+    const subscription = new FirehoseSubscription(db, cfg.subscriptionEndpoint, cfg)
+    const result = await subscription.evaluateCreate({
+      uri: 'at://candidate-disabled-llm',
+      cid: 'cid-disabled-llm',
+      author: 'did:plc:test',
+      text: 'AEMET activa aviso naranja por lluvias intensas y rachas fuertes en Valencia. Se recomienda evitar desplazamientos y extremar la precaucion.',
+      langs: ['es'],
+    })
+
+    expect(result.post).toBeUndefined()
+    expect(result.metricDeltas.posts_sent_to_llm).toBe(0)
+    expect(result.metricDeltas.posts_rejected_low_score).toBe(1)
+  })
 })

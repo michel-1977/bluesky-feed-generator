@@ -114,14 +114,6 @@ export class FirehoseSubscription extends FirehoseSubscriptionBase {
       return { metricDeltas }
     }
 
-    if (ruleDecision.action === 'accept') {
-      applyAcceptedCounter(metricDeltas, ruleDecision.sourceTier)
-      return {
-        metricDeltas,
-        post: createStoredPost(candidate, ruleDecision.score, ruleDecision.sourceTier, ruleDecision.decisionReason, ruleDecision.filterVersion),
-      }
-    }
-
     if (!this.cfg.llmFilter.enabled) {
       metricDeltas.posts_rejected_low_score += 1
       return { metricDeltas }

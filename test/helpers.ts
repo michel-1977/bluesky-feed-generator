@@ -34,7 +34,7 @@ export const createTestConfig = (
     minConfidence: 0.85,
     failOpen: false,
   },
-  ruleLlmMinScore: 60,
+  ruleLlmMinScore: 70,
   ruleAutoAcceptScore: 85,
   filterVersion: FILTER_VERSION,
   maxPostAgeHours: 0,

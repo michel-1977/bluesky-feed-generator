@@ -23,7 +23,7 @@ export type RuleRejectMetric =
   | 'posts_rejected_low_score'
 
 export type RuleClassification = {
-  action: 'accept' | 'review' | 'reject'
+  action: 'review' | 'reject'
   score: number
   sourceTier: SourceTier
   filterVersion: string
@@ -132,28 +132,16 @@ export const classifyCandidatePost = (
       Math.min(18, negativeContextHits.length * 9),
   )
 
-  if (hasClearNeutralLocalReport) {
+  if (
+    hasClearNeutralLocalReport ||
+    (score >= input.ruleAutoAcceptScore && negativeContextHits.length === 0)
+  ) {
     return {
-      action: 'accept',
+      action: 'review',
       score,
       sourceTier,
       filterVersion: FILTER_VERSION,
-      decisionReason: buildDecisionReason('rule_accept', {
-        sourceTier,
-        strongPhraseHits,
-        institutionHits,
-        geographyHits,
-      }),
-    }
-  }
-
-  if (score >= input.ruleAutoAcceptScore && negativeContextHits.length === 0) {
-    return {
-      action: 'accept',
-      score,
-      sourceTier,
-      filterVersion: FILTER_VERSION,
-      decisionReason: buildDecisionReason('rule_accept', {
+      decisionReason: buildDecisionReason('llm_review', {
         sourceTier,
         strongPhraseHits,
         institutionHits,

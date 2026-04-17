@@ -30,7 +30,7 @@ const run = async () => {
   const llmFilterEnabled = maybeBool(process.env.FEEDGEN_LLM_FILTER_ENABLED)
   const llmFilterApiKey = maybeStr(process.env.FEEDGEN_LLM_API_KEY)
   const llmFilterConfigured = (llmFilterEnabled ?? false) && !!llmFilterApiKey
-  const ruleLlmMinScore = maybeInt(process.env.FEEDGEN_RULE_LLM_MIN_SCORE) ?? 60
+  const ruleLlmMinScore = maybeInt(process.env.FEEDGEN_RULE_LLM_MIN_SCORE) ?? 70
   const ruleAutoAcceptScore =
     maybeInt(process.env.FEEDGEN_RULE_AUTO_ACCEPT_SCORE) ?? 85
 
